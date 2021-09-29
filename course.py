@@ -47,4 +47,10 @@ def validateCourse(data):
         else:
             data["duration"] = int(duration)
             
+            if data["duration"] < 1:
+                return {
+                    "status_code":422,
+                    "message":"The duration of course not accept, insert int numbers > 0"
+                }
+            
     return data,True
