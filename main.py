@@ -145,7 +145,7 @@ def updateStudent(user=None):
                         return generateResponses(201, f"Student update success")
 
                     
-# Cadastrar e atualizar novos cursos
+# Cadastrar novos cursos
 @app.route("/register/course", methods=["POST"])
 def registerCourse():
     header=request.headers.get("Authorization")
@@ -207,6 +207,83 @@ def registerCourse():
             
                 return generateResponses(201,"User registration success", "student", data)
             
+
+#Atualizar novo cursos
+@app.route("/update/course/<course>", methods=["POST","PUT"])
+def updateCourse(course):
+    header=request.headers.get("Authorization")
+    try:        
+        body = request.get_json(force=True)
+    except:
+        return generateResponses(400, 'I need a valid JSON in the request body')
+    
+    course_keys = ["name", "description", "holder_image", "duration"]            
+    autho = checkHeader(header)
+    
+    if not autho[1]:
+        return generateResponses(autho['status_code'],autho['message']),autho[2]
+    
+    else:
+        if not course:
+            return generateResponses(400, "Please, insert course key '_id' for update")
+        else:
+            db = MongoDb(set_dataBase="apiTest",collection="course")
+            print(course)
+            data = db.find_one({"_id":int(course)})
+            print(data)
+            if not data:
+                return generateResponses(404, f"Course key '{course}' Not Found")
+            else:
+                for key in body.keys():
+                    if not key in course_keys:
+                        return generateResponses(400, f"The key '{key}' cannot update course")
+                
+                if not valeusNotNull(body)[1]:
+                    data = valeusNotNull(body)[0]
+                    return generateResponses(data["status_code"], data["message"])
+        
+                body = validateCourse(body)
+                if not body[1]:
+                    return generateResponses(body[0]['status_code'],body[0]['message'])
+                else:
+                    body=body[0]
+                    body['date_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    try:
+                        print(body)
+                        db.update_one({"_id":int(course)},body)
+                    
+                    except Exception as error:
+                        return generateResponses(500, f"Connot save,Internal Error:\n{error}")
+                    
+                    else:
+                        return generateResponses(201, f"Course update success")
+
+
+# Listar todos os cursos do catalogo
+@app.route("/read/course", methods=["GET"])
+def readCourse ():
+    db = MongoDb(set_dataBase="apiTest",collection="course")
+    data = db.find_all()
+    print(data)
+    if not data:
+        return generateResponses(200, "No have data to show here")
+    else:
+        return generateResponses(200, "Data found successfully", "data",data)
+
+# Listar todos os alunos
+@app.route("/read/student", methods=["GET"])
+def readStudent ():
+    db = MongoDb(set_dataBase="apiTest",collection="student")
+    data = db.find_all()
+    for row in data:
+        row["_id"] = str(row["_id"])
+    
+    if not data:
+        return generateResponses(200, "No have data to show here")
+    else:
+        return generateResponses(200, "Data found successfully", "data",data)
+
+
 """
 # Matricular um aluno em um curso
 @app.route("/oi", methods=["GET"])
@@ -216,16 +293,6 @@ def teste ():
 
 
 # Excluir cursos existentes
-@app.route("/oi", methods=["GET"])
-def teste ():
-    pass
-
-# Listar todos os cursos do catalogo
-@app.route("/oi", methods=["GET"])
-def teste ():
-    pass
-
-# Listar todos os alunos
 @app.route("/oi", methods=["GET"])
 def teste ():
     pass
