@@ -89,10 +89,9 @@ class MongoDb():
     def update_one(self,query,set_update):
         self.conector.find_one_and_update(query,{"$set":set_update})
     
-    def find_and_delete(self,data):
-        pass
-        #Construi as funções mais importantes primeiro, inserir, procurar e atualizar    
-    
+    def find_and_delete(self,query:dict):
+        self.conector.find_one_and_delete(query)
+        
 class SqliteDb():
     def __init__(self,path:str="data/dataBase.db"):
         self.db = path
