@@ -284,6 +284,7 @@ def readStudent ():
         return generateResponses(200, "Data found successfully", "data",data)
 
 
+
 """
 # Matricular um aluno em um curso
 @app.route("/oi", methods=["GET"])
@@ -292,10 +293,7 @@ def teste ():
 
 
 
-# Excluir cursos existentes
-@app.route("/oi", methods=["GET"])
-def teste ():
-    pass
+
 
 
 # Remover o aluno de um curso
