@@ -87,7 +87,7 @@ def addStudent():
             data['date_updated'] = date
             data['_id'] = len(db.find_all())+1
             db.insert_one(data)
-            
+            del data["enrollment_course"]
             return generateResponses(201,"User registration success", "student", data)
                 
                     
@@ -199,7 +199,8 @@ def registerCourse():
                 data=data[0]
                 db = MongoDb(set_dataBase="apiTest",collection="course")
                 date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                print(data)
+                (data)
+                data["active_course"]=False
                 data['date_created'] = date
                 data['date_updated'] = date
                 data['_id'] = len(db.find_all())+1
@@ -217,7 +218,7 @@ def updateCourse(course):
     except:
         return generateResponses(400, 'I need a valid JSON in the request body')
     
-    course_keys = ["name", "description", "holder_image", "duration"]            
+    course_keys = ["name", "description", "holder_image", "duration", "active_course"]            
     autho = checkHeader(header)
     
     if not autho[1]:
@@ -228,9 +229,9 @@ def updateCourse(course):
             return generateResponses(400, "Please, insert course key '_id' for update")
         else:
             db = MongoDb(set_dataBase="apiTest",collection="course")
-            print(course)
+            
             data = db.find_one({"_id":int(course)})
-            print(data)
+            
             if not data:
                 return generateResponses(404, f"Course key '{course}' Not Found")
             else:
@@ -241,7 +242,10 @@ def updateCourse(course):
                 if not valeusNotNull(body)[1]:
                     data = valeusNotNull(body)[0]
                     return generateResponses(data["status_code"], data["message"])
-        
+                
+                if type(body["active_course"]) != bool:
+                    return generateResponses(422, "Please, insert type Bool (True or False) for update in key 'active_course'")
+                
                 body = validateCourse(body)
                 if not body[1]:
                     return generateResponses(body[0]['status_code'],body[0]['message'])
@@ -249,7 +253,7 @@ def updateCourse(course):
                     body=body[0]
                     body['date_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     try:
-                        print(body)
+                        
                         db.update_one({"_id":int(course)},body)
                     
                     except Exception as error:
@@ -264,7 +268,7 @@ def updateCourse(course):
 def readCourse ():
     db = MongoDb(set_dataBase="apiTest",collection="course")
     data = db.find_all()
-    print(data)
+    
     if not data:
         return generateResponses(200, "No have data to show here")
     else:
@@ -284,23 +288,203 @@ def readStudent ():
         return generateResponses(200, "Data found successfully", "data",data)
 
 
-
-"""
 # Matricular um aluno em um curso
-@app.route("/oi", methods=["GET"])
-def teste ():
-    pass
+@app.route("/enroll/course/<id_course>/student/<cpf>", methods=["GET"])
+def enrollment(id_course,cpf):
+    db_student = MongoDb(set_dataBase="apiTest",collection="student")
+    data_student = db_student.find_one({"cpf":cpf})
+    
+    if not data_student:
+        return generateResponses(422, f"This cpf {cpf} was not found")
+    
+    else:
+        db_course = MongoDb(set_dataBase="apiTest",collection="course")
+        data_course = db_course.find_one({"_id":int(id_course)})
+        if not data_course:
+            return generateResponses(422, f"This course {id_course} was not found")
+        
+        else:           
+            data = {
+                "student":cpf,
+                "date_enroll":datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                "date_close":"",
+                "score":0,
+                "status":"andamento"        
+            }
+                  
+            try:
+                enroll = db_course.find_one({"_id":int(id_course)})["enrollment_course"]
+                
+            except:
+                enroll = []
+            
+            finally:
+                for row in enroll:
+                    if cpf in row["student"]:
+                        return generateResponses(200, f"This CPF {cpf} already has in the course informed")
+                
+                data["id"] = len(enroll)+1
+                enroll.append(data)
+        
+            try:              
+                db_course.update_one({"_id":int(id_course)},{"active_course":True,"enrollment_course":enroll})
+            
+            except:
+                return generateResponses(500, f"An internal error has occurred and cannot be created")
+            
+            else:                    
+                
+                return generateResponses(201, f"Student enrollment was successful.","enrollment_create",data)
+            
 
+# Atualizar matricula do aluno
+@app.route("/update/enrollment/<id_course>/student/<cpf>", methods=["POST","PUT"])
+def updateEnrollment(id_course,cpf):
+    db_student = MongoDb(set_dataBase="apiTest",collection="student")
+    data_student = db_student.find_one({"cpf":cpf})
+    enroll_keys = ["score", "status"]
+    try:        
+        body = request.get_json(force=True)
+    except:
+        return generateResponses(400, 'I need a valid JSON in the request body')
+    
+    if not data_student:
+        return generateResponses(422, f"This cpf {cpf} was not found")
+    
+    else:
+        db_course = MongoDb(set_dataBase="apiTest",collection="course")
+        data_course = db_course.find_one({"_id":int(id_course)})
+        if not data_course:
+            return generateResponses(422, f"This course {id_course} was not found")
+        
+        else:
+            for key in enroll_keys:
+                if key not in body.keys():
+                    return generateResponses(400, f"I need see '{key}' in body")
+            
+            for key in body.keys():
+                if key not in enroll_keys:
+                    return generateResponses(400, f"The key '{key}' cannot update enrollment")
+                
+            try:
+                if type(body["score"]) == float or type(body["score"]) == int:
+                    if body["score"] < 0 or body["score"] > 10:
+                        return generateResponses(400, f"The key 'score' need values ​​between 0 and 10")
+                    
+                    else:
+                        score = body["score"]
+                
+                else:    
+                    score = float( #Rransform string in type float
+                        "".join( #re.findall return list, this join concatenate all number and . in the list
+                            re.findall(
+                                "[0-9.-]", #Regex for get numbers and .
+                                body["score"] #Variable to perform the regex
+                            )
+                        )
+                    )
+                    
+                    if score < 0 or score > 10:
+                        return generateResponses(400, f"The key 'score' need values ​​between 0 and 10")
+                    
+            except:
+                return generateResponses(400, f"The key 'score' needs type float")
+            
+            else:
+                body["score"] = score
+                
+            status_enroll = ["aprovado", "reprovado", "andamento"]
+            if body["status"] not in status_enroll:   
+                return generateResponses(400, f"The value in key 'status' cannot update enrollment","example_permited",{1:"andamento",2:"reprovado",3:"aprovado"})
+            
+            else:
+                status_course = False
+                for row in data_course["enrollment_course"]:
+                    if row["student"] == cpf:
+                        row["score"] = body["score"]
+                        row["status"] = body["status"]
+                        row["date_close"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        status_course = True
+                if not status_course:
+                    return generateResponses(422, f"This cpf {cpf} was not found")
+                
+                else:
+                    try:       
+                        db_course.update_one({"_id":int(id_course)},data_course)
+                    
+                    except:
+                        return generateResponses(500, f"An internal error has occurred and cannot be update")
+                    
+                    else:
+                        return generateResponses(201, f"Course update success")
 
-
-
+                    
 
 
 # Remover o aluno de um curso
-
-@app.route("/oi", methods=["GET"])
-def teste ():
-    pass
-"""
+@app.route("/unenroll/course/<id_course>/student/<cpf>", methods=["DELETE"])
+def unenrollment(id_course,cpf):
+    db_student = MongoDb(set_dataBase="apiTest",collection="student")
+    data_student = db_student.find_one({"cpf":cpf})
+    
+    if not data_student:
+        return generateResponses(422, f"This cpf {cpf} was not found")
+    
+    else:
+        db_course = MongoDb(set_dataBase="apiTest",collection="course")
+        data_course = db_course.find_one({"_id":int(id_course)})
+        if not data_course:
+            return generateResponses(422, f"This course {id_course} was not found")
+        
+        else: 
+            try:
+                enroll = db_course.find_one({"_id":int(id_course)})["enrollment_course"]
+                
+            except:
+                enroll = []
+            
+            finally:
+                if not enroll:
+                    return generateResponses(422, "This course has no student enrolled")
+                
+                else:
+                    for row in enroll:
+                        if cpf not in row["student"]:
+                            return generateResponses(400, f"This CPF {cpf} not in the course informed")
+                        
+                        else:
+                            data = enroll.pop(enroll.index(row))
+                    
+                    try:              
+                        db_course.update_one({"_id":int(id_course)},{"enrollment_course":enroll})
+            
+                    except:
+                        return generateResponses(500, f"An internal error has occurred and cannot be remove")
+                    
+                    else:                                           
+                        return generateResponses(200, f"Student's enrollment cancellation was successful","student_removed",data)
+                    
+                        
+#Excluir cursos existentes
+@app.route("/delete/course/<id_course>", methods=["DELETE"])
+def deleteCourse(id_course):
+    db = MongoDb(set_dataBase="apiTest",collection="course")
+    data = db.find_one({"_id":int(id_course)})
+    if not data:
+        return generateResponses(422, f"This course {id_course} was not found")
+    
+    else:
+        if data["active_course"]:
+            return generateResponses(422, "This course is active, you need to deactivate it first to delete it. Go update and try again")
+            
+        else:
+            try:
+                db.find_and_delete({"_id":int(id_course)})
+                
+            except:
+                return generateResponses(500, f"An internal error has occurred and cannot be remove")
+            
+            else:
+                return generateResponses(200, f"Course deleted successfully", "course_deleted", data)
 
 app.run()
