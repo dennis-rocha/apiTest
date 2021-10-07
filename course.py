@@ -17,11 +17,15 @@ def validateCourse(data):
         data["description"] = data["description"].strip()
     
     except:
-        if data["description"] != str:
-            return {
-                "status_code":400,
-                "message":"The description needs text"
-            },False
+        try:
+            if data["description"] != str:
+                return {
+                    "status_code":400,
+                    "message":"The description needs text"
+                },False
+                
+        except:
+            pass
     
     else:
         if len(data["description"]) < 10:
