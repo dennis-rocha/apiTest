@@ -3,10 +3,11 @@
 def valeusNotNull(data):
     for k,v in data.items():
         if not v:
-            return {
-                "status_code":400,
-                "message":f"The key '{k}' Not Null"
-            },False
+            if type(v) != bool: 
+                return {
+                    "status_code":400,
+                    "message":f"The key '{k}' Not Null"
+                },False
     return data,True
 
 def checkHeader(header=None,methods=None):
