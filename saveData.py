@@ -60,9 +60,14 @@ class MongoDb():
             'age':25
         }
     
-    - find_and_delete(data)
-        This function delete one item.
-        I haven't created the delete function yet.
+    - find_and_delete(query)
+        This function delete one item. Needs a query to find one item for remove
+        example:
+        query = {
+            'name':'Jhon Wesley',
+            'age':25
+        }
+        
     
     """
     
